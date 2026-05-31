@@ -1,61 +1,73 @@
 from kafka import KafkaConsumer
-import json
 import psycopg2
+import json
 
 consumer = KafkaConsumer(
-    'market_ticks',
+    "market_candles_1m",
 
-    bootstrap_servers='localhost:9092',
+    bootstrap_servers="localhost:9092",
 
-    auto_offset_reset='earliest',
+    group_id="market-db-consumer-v1",
 
-    enable_auto_commit=False,
+    auto_offset_reset="latest",
 
-    group_id='market-db-consumer-v2',
-
-    value_deserializer=lambda x: json.loads(x.decode('utf-8'))
+    value_deserializer=lambda x: json.loads(
+        x.decode("utf-8")
+    )
 )
 
-connection = psycopg2.connect(
-    host='localhost',
+conn = psycopg2.connect(
+    host="localhost",
     port=5432,
-    database='market_db',
-    user='postgres',
-    password='password'
+    database="market_db",
+    user="postgres",
+    password="password"
 )
 
-cursor = connection.cursor()
+cursor = conn.cursor()
 
-print("DB Consumer started...\n")
+print("DB Consumer Started...")
 
 for message in consumer:
 
     data = message.value
 
     insert_query = """
-        INSERT INTO market_ticks
-        (
-            symbol,
-            price,
-            volume,
-            exchange,
-            event_time
-        )
-
-        VALUES (%s, %s, %s, %s, %s)
+    INSERT INTO market_candles_1m
+    (
+        symbol,
+        exchange,
+        open_price,
+        high_price,
+        low_price,
+        close_price,
+        volume,
+        event_time,
+        ingestion_time
+    )
+    VALUES
+    (
+        %s,%s,%s,%s,%s,%s,%s,%s,%s
+    )
     """
 
     cursor.execute(
         insert_query,
         (
-            data['symbol'],
-            data['price'],
-            data['volume'],
-            data['exchange'],
-            data['event_time']
+            data["symbol"],
+            data["exchange"],
+            data["open_price"],
+            data["high_price"],
+            data["low_price"],
+            data["close_price"],
+            data["volume"],
+            data["event_time"],
+            data["ingestion_time"]
         )
     )
 
-    connection.commit()
+    conn.commit()
 
-    print(f"Inserted into DB: {data}")
+    print(
+        f"Inserted {data['symbol']} into DB"
+    )
