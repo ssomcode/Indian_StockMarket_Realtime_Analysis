@@ -49,6 +49,19 @@ for message in consumer:
     (
         %s,%s,%s,%s,%s,%s,%s,%s,%s
     )
+
+
+    ON CONFLICT (symbol, event_time)
+
+    DO UPDATE SET
+
+    exchange = EXCLUDED.exchange,
+    open_price = EXCLUDED.open_price,
+    high_price = EXCLUDED.high_price,
+    low_price = EXCLUDED.low_price,
+    close_price = EXCLUDED.close_price,
+    volume = EXCLUDED.volume,
+    ingestion_time = CURRENT_TIMESTAMP;   
     """
 
     cursor.execute(

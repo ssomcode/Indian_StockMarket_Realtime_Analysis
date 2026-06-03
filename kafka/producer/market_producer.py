@@ -34,9 +34,12 @@ while True:
                 print(f"No data available for {stock}")
                 continue
 
-            latest = df.iloc[-1]
+            if len(df) < 2:
+                continue
 
-            candle_time = latest.name
+            latest = df.iloc[-2]
+
+            candle_time = df.index[-2]
 
             candle_data = {
 
@@ -61,7 +64,7 @@ while True:
             }
 
             producer.send(
-                "market_ticks",
+                "market_candles_1m",
                 value=candle_data
             )
 
@@ -79,3 +82,5 @@ while True:
             print(f"Error for {stock}: {e}")
 
     time.sleep(60)
+
+
