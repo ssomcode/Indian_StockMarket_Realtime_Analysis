@@ -1,13 +1,37 @@
 from kafka import KafkaProducer
 import yfinance as yf
+import psycopg2
+import pandas as pd
 import json
 import time
 from datetime import datetime
+
+# --------------------------------
+# Kafka
+# --------------------------------
 
 producer = KafkaProducer(
     bootstrap_servers="localhost:9092",
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
+
+# --------------------------------
+# PostgreSQL
+# --------------------------------
+
+conn = psycopg2.connect(
+    host="localhost",
+    port=5432,
+    database="market_db",
+    user="postgres",
+    password="password"
+)
+
+cursor = conn.cursor()
+
+# --------------------------------
+# Stocks
+# --------------------------------
 
 stocks = [
     "RELIANCE.NS",
@@ -17,11 +41,36 @@ stocks = [
     "ICICIBANK.NS"
 ]
 
+print("Producer Started...")
+
+# --------------------------------
+# Main Loop
+# --------------------------------
+
 while True:
 
     for stock in stocks:
 
         try:
+
+            # --------------------------------
+            # Get latest processed candle
+            # --------------------------------
+
+            cursor.execute(
+                """
+                SELECT MAX(event_time)
+                FROM market_candles_1m
+                WHERE symbol = %s
+                """,
+                (stock,)
+            )
+
+            last_event_time = cursor.fetchone()[0]
+
+            # --------------------------------
+            # Download today's 1-minute candles
+            # --------------------------------
 
             ticker = yf.Ticker(stock)
 
@@ -34,53 +83,95 @@ while True:
                 print(f"No data available for {stock}")
                 continue
 
-            if len(df) < 2:
+            df = df.reset_index()
+
+            # --------------------------------
+            # Remove currently forming candle
+            # --------------------------------
+
+            if len(df) <= 1:
                 continue
 
-            latest = df.iloc[-2]
+            df = df.iloc[:-1]
 
-            candle_time = df.index[-2]
+            # --------------------------------
+            # Only fetch missing candles
+            # --------------------------------
 
-            candle_data = {
+            if last_event_time is not None:
 
-                "symbol": stock,
+                last_event_time = (
+                    pd.Timestamp(last_event_time)
+                    .tz_localize("Asia/Kolkata")
+                    )
+                
 
-                "exchange": "NSE",
+                df = df[
+                    df["Datetime"] >
+                    last_event_time
+                ]
 
-                "open_price": round(float(latest["Open"]), 2),
+            if df.empty:
+                continue
 
-                "high_price": round(float(latest["High"]), 2),
+            # --------------------------------
+            # Publish all missing candles
+            # --------------------------------
 
-                "low_price": round(float(latest["Low"]), 2),
+            for _, row in df.iterrows():
 
-                "close_price": round(float(latest["Close"]), 2),
+                candle_data = {
 
-                "volume": int(latest["Volume"]),
+                    "symbol": stock,
 
-                "event_time": candle_time.isoformat(),
+                    "exchange": "NSE",
 
-                "ingestion_time" : datetime.now().isoformat()
+                    "open_price": round(
+                        float(row["Open"]), 2
+                    ),
 
-            }
+                    "high_price": round(
+                        float(row["High"]), 2
+                    ),
 
-            producer.send(
-                "market_candles_1m",
-                value=candle_data
-            )
+                    "low_price": round(
+                        float(row["Low"]), 2
+                    ),
+
+                    "close_price": round(
+                        float(row["Close"]), 2
+                    ),
+
+                    "volume": int(
+                        row["Volume"]
+                    ),
+
+                    "event_time":
+                    row["Datetime"].isoformat(),
+
+                    "ingestion_time":
+                    datetime.now().isoformat()
+                }
+
+                producer.send(
+                    "market_candles_1m",
+                    value=candle_data
+                )
+
+                print(
+                    f"Produced: "
+                    f"{stock} | "
+                    f"{row['Datetime']}"
+                )
 
             producer.flush()
 
-            # print(
-            #     f"Produced: {stock} | "
-            #     f"Close={candle_data['close_price']} | "
-            #     f"Time={candle_data['event_time']} | "
-            #     f"Ingestion Tume {candle_data['ingestion_time']}"
-            # )
-            print(candle_data)
         except Exception as e:
 
-            print(f"Error for {stock}: {e}")
+            print(
+                f"Error for {stock}: {e}"
+            )
+
+        # print(f"Produced :  {candle_data}")
 
     time.sleep(60)
-
-
