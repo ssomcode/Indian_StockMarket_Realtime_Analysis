@@ -4,6 +4,18 @@ from pyspark.sql.functions import *
 import pandas as pd
 from pyspark.sql.types import *
 
+# creating cursor to execture queries on table
+import psycopg2
+
+conn = psycopg2.connect(
+    host="localhost",
+    port=5432,
+    database="market_db",
+    user="postgres",
+    password="password"
+)
+
+cursor = conn.cursor()
 
 # ----------------------------------
 # Spark Session
@@ -68,10 +80,7 @@ df = (
         "close_price",
         col("close_price").cast("double")
     )
-    .withColumn(
-        "previous_day_close",
-        lit(None).cast("double")
-    )
+    
 )
 
 # create window
@@ -141,6 +150,115 @@ df = (
     )
 )
 
+# Close vs sma20%
+df = df.withColumn(
+    "close_vs_sma20_pct",
+    round(
+        (
+            (col("close_price") - col("sma_20"))
+            /
+            col("sma_20")
+        ) * 100,
+        2
+    )
+)
+
+#close vs sma50
+df = df.withColumn(
+    "close_vs_sma50_pct",
+    round(
+        (
+            (col("close_price") - col("sma_50"))
+            /
+            col("sma_50")
+        ) * 100,
+        2
+    )
+)
+
+#==========================
+# metrics of 5 day ago
+
+df = df.withColumn(
+    "close_5d_ago",
+    lag("close_price", 5)
+    .over(window_symbol)
+)
+
+df = df.withColumn(
+    "return_5d_pct",
+    round(
+        (
+            (
+                col("close_price")
+                -
+                col("close_5d_ago")
+            )
+            /
+            col("close_5d_ago")
+        ) * 100,
+        2
+    )
+)
+
+#=========================
+# 20 day ago metrics
+
+df = df.withColumn(
+    "close_20d_ago",
+    lag("close_price", 20)
+    .over(window_symbol)
+)
+
+df = df.withColumn(
+    "return_20d_pct",
+    round(
+        (
+            (
+                col("close_price")
+                -
+                col("close_20d_ago")
+            )
+            /
+            col("close_20d_ago")
+        ) * 100,
+        2
+    )
+)
+
+#=========================
+# Rolling volatility
+
+# first calculate daily return number
+df = df.withColumn(
+    "daily_return_raw",
+    (
+        (
+            col("close_price")
+            -
+            col("previous_day_close")
+        )
+        /
+        col("previous_day_close")
+    )
+)
+
+# 20 day rolling volatility
+df = df.withColumn(
+    "rolling_volatility_20",
+    round(
+        stddev(
+            "daily_return_raw"
+        ).over(window_20) * 100,
+        2
+    )
+)
+
+df = df.drop(
+    "close_20d_ago",
+    "close_5d_ago",
+    "daily_return_raw"
+)
 ## Pandas defined function to calculate EMA's
 
 result_schema = StructType([
@@ -163,9 +281,16 @@ result_schema = StructType([
     StructField("sma_50", DoubleType()),
     StructField("avg_volume_20", DoubleType()),
     StructField("volume_ratio", DoubleType()),
+    StructField("close_vs_sma20_pct", DoubleType()),
+    StructField("close_vs_sma50_pct", DoubleType()),
+    StructField("return_5d_pct", DoubleType()),
+    StructField("return_20d_pct", DoubleType()),
+    StructField("rolling_volatility_20", DoubleType()),
     StructField("ema_20", DoubleType()),
     StructField("ema_50", DoubleType()),
-    StructField("ema_spread", DoubleType())
+    StructField("ema_spread", DoubleType()),
+    StructField("close_vs_ema20_pct", DoubleType()),
+    StructField("close_vs_ema50_pct", DoubleType())
 ])
 
 # function to calulate ema
@@ -183,6 +308,7 @@ def calculate_ema(pdf):
             adjust=False
         )
         .mean()
+        .round(2)
     )
 
     pdf["ema_50"] = (
@@ -192,13 +318,38 @@ def calculate_ema(pdf):
             adjust=False
         )
         .mean()
+        .round(2)
     )
 
     pdf["ema_spread"] = (
         pdf["ema_20"]
         -
         pdf["ema_50"]
-    )
+    ).round(2)
+
+    pdf["close_vs_ema20_pct"] = (
+        (
+            (
+                pdf["close_price"]
+                -
+                pdf["ema_20"]
+            )
+            /
+            pdf["ema_20"]
+        ) * 100
+    ).round(2)
+
+    pdf["close_vs_ema50_pct"] = (
+        (
+            (
+                pdf["close_price"]
+                -
+                pdf["ema_50"]
+            )
+            /
+            pdf["ema_50"]
+        ) * 100
+    ).round(2)
 
     return pdf
 
@@ -212,20 +363,98 @@ feature_df = (
     )
 )
 
-feature_df.select(
+feature_df = (
+    feature_df
+
+    .withColumn(
+        "sma_20",
+        round(col("sma_20"), 2)
+    )
+
+    .withColumn(
+        "sma_50",
+        round(col("sma_50"), 2)
+    )
+
+    .withColumn(
+        "avg_volume_20",
+        round(col("avg_volume_20"), 2)
+    )
+
+    .withColumn(
+        "volume_ratio",
+        round(col("volume_ratio"), 4)
+    )
+)
+
+
+final_df = feature_df.select(
     "symbol",
     "event_date",
     "close_price",
+    "previous_day_high",
+    "previous_day_low",
+    "previous_day_close",
+    "gap_pct",
+    "daily_return_pct",
+    "return_5d_pct",
+    "return_20d_pct",
+    "range_pct",
+    "rolling_volatility_20",
     "sma_20",
     "sma_50",
     "ema_20",
     "ema_50",
     "ema_spread",
+    "close_vs_sma20_pct",
+    "close_vs_sma50_pct",
+    "close_vs_ema20_pct",
+    "close_vs_ema50_pct",
+    "avg_volume_20",
     "volume_ratio"
-).show(
-    20,
-    False
 )
+
+
+
+# truncate the table before inserting the data
+cursor.execute("TRUNCATE TABLE daily_market_features RESTART IDENTITY;;")
+
+conn.commit()
+cursor.close()
+conn.close()
+
+
+print("Rows to load:", final_df.count())
+final_df.show(5,False)
+
+## inserting the data into table "daily_market_features"
+final_df.write \
+    .format("jdbc") \
+    .option(
+        "url",
+        "jdbc:postgresql://localhost:5432/market_db"
+    ) \
+    .option(
+        "dbtable",
+        "daily_market_features"
+    ) \
+    .option(
+        "user",
+        "postgres"
+    ) \
+    .option(
+        "password",
+        "password"
+    ) \
+    .option(
+        "driver",
+        "org.postgresql.Driver"
+    ) \
+    .mode("append") \
+    .save()
+
+#
+print("Daily Features Loaded Successfully.")
 
 # ----------------------------------
 # Stop Spark
