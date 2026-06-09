@@ -74,7 +74,7 @@ for symbol in df["symbol"].unique():
         temp["previous_day_close"]
     ) * 100
 
-    # Daily Return %
+    # Daily Return % (Close - PDC) / PDC
 
     temp["daily_return_pct"] = (
         (
@@ -86,7 +86,7 @@ for symbol in df["symbol"].unique():
         temp["previous_day_close"]
     ) * 100
 
-    # Range %
+    # Range % (high - low) / close
 
     temp["range_pct"] = (
         (

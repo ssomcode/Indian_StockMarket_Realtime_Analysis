@@ -48,6 +48,32 @@ df = (
 print(f"Total Rows: {df.count()}")
 
 
+## converting numeric to decimal
+
+df = (
+    df
+    .withColumn(
+        "open_price",
+        col("open_price").cast("double")
+    )
+    .withColumn(
+        "high_price",
+        col("high_price").cast("double")
+    )
+    .withColumn(
+        "low_price",
+        col("low_price").cast("double")
+    )
+    .withColumn(
+        "close_price",
+        col("close_price").cast("double")
+    )
+    .withColumn(
+        "previous_day_close",
+        lit(None).cast("double")
+    )
+)
+
 # create window
 window_symbol = (
     Window.partitionBy('symbol').orderBy('event_date')
@@ -185,7 +211,6 @@ feature_df = (
         schema=result_schema
     )
 )
-
 
 feature_df.select(
     "symbol",
