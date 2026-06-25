@@ -50,7 +50,11 @@ for stock in stocks:
             continue
 
         for timestamp, row in df.iterrows():
-
+            timestamp_ist = (
+            timestamp
+            .tz_convert("Asia/Kolkata")
+            .tz_localize(None)
+            )
             insert_query = """
             INSERT INTO market_candles_1m
             (
@@ -94,10 +98,12 @@ for stock in stocks:
 
                     int(row["Volume"]),
 
-                    timestamp.to_pydatetime(),
+                    timestamp_ist.to_pydatetime(),
                     datetime.now().isoformat()
                 )
             )
+
+            
 
         conn.commit()
 
