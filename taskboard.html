@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>📊 Stock ML — Task Board</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel2:#1c2230; --border:#2a3240;
+    --txt:#e6edf3; --muted:#8b949e; --accent:#2f81f7; --accent2:#1f6feb;
+    --green:#2ea043; --amber:#d29922; --red:#da3633; --purple:#8957e5;
+    --shadow:0 6px 20px rgba(0,0,0,.35);
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:14px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  a{color:var(--accent)}
+  header{position:sticky;top:0;z-index:20;background:linear-gradient(180deg,#11161d,#0d1117);border-bottom:1px solid var(--border);padding:12px 18px}
+  .hrow{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+  h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+  .sub{color:var(--muted);font-size:12px}
+  .spacer{flex:1}
+  .tabs{display:flex;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:4px}
+  .tab{padding:6px 14px;border-radius:7px;cursor:pointer;color:var(--muted);font-weight:600;font-size:13px;user-select:none}
+  .tab.active{background:var(--accent2);color:#fff}
+  .btn{background:var(--panel);border:1px solid var(--border);color:var(--txt);padding:6px 12px;border-radius:8px;cursor:pointer;font-size:12.5px;font-weight:600}
+  .btn:hover{border-color:var(--accent)}
+  .btn.small{padding:4px 9px;font-size:11.5px}
+  .prog-wrap{display:flex;align-items:center;gap:10px;min-width:220px}
+  .bar{flex:1;height:8px;background:#0a0e14;border:1px solid var(--border);border-radius:99px;overflow:hidden}
+  .bar > i{display:block;height:100%;background:linear-gradient(90deg,#2ea043,#2f81f7);width:0%}
+  main{padding:16px 18px 60px}
+
+  /* filters */
+  .filters{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;align-items:center}
+  .chip{padding:4px 11px;border:1px solid var(--border);border-radius:99px;cursor:pointer;color:var(--muted);font-size:12px;font-weight:600;user-select:none;background:var(--panel)}
+  .chip.on{background:var(--panel2);color:var(--txt);border-color:var(--accent)}
+
+  /* board */
+  .board{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+  @media(max-width:1100px){.board{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.board{grid-template-columns:1fr}}
+  .col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:120px}
+  .col.drop{outline:2px dashed var(--accent);outline-offset:-4px}
+  .col h3{margin:0 0 10px;font-size:12.5px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);display:flex;justify-content:space-between}
+  .col h3 .n{background:var(--panel2);border-radius:99px;padding:1px 8px;color:var(--txt);font-size:11px}
+  .card{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:9px;padding:9px 10px;margin-bottom:9px;cursor:grab}
+  .card:active{cursor:grabbing}
+  .card.dragging{opacity:.5}
+  .card .cid{font-size:10.5px;color:var(--muted);font-weight:700;letter-spacing:.4px}
+  .card .ct{font-size:13px;font-weight:600;margin:3px 0 7px}
+  .card .meta{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+  .pill{font-size:10px;font-weight:700;padding:1px 7px;border-radius:99px}
+  .d-e{background:rgba(46,160,67,.15);color:#4ac26b;border:1px solid rgba(46,160,67,.4)}
+  .d-s{background:rgba(210,153,34,.15);color:#e3b341;border:1px solid rgba(210,153,34,.4)}
+  .d-n{background:rgba(218,54,51,.15);color:#f0605d;border:1px solid rgba(218,54,51,.4)}
+  .epk{font-size:10px;color:var(--muted);border:1px solid var(--border);border-radius:99px;padding:1px 7px}
+  .miniprog{height:5px;background:#0a0e14;border-radius:99px;margin-top:8px;overflow:hidden}
+  .miniprog > i{display:block;height:100%;background:var(--green)}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;z-index:40;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+  .overlay.show{display:flex}
+  .modal{background:var(--panel);border:1px solid var(--border);border-radius:14px;max-width:640px;width:100%;box-shadow:var(--shadow)}
+  .modal .mhead{padding:16px 18px;border-bottom:1px solid var(--border)}
+  .modal .mbody{padding:16px 18px}
+  .modal h2{margin:2px 0 6px;font-size:18px}
+  .x{float:right;cursor:pointer;color:var(--muted);font-size:22px;line-height:1}
+  .sublist{list-style:none;padding:0;margin:10px 0}
+  .sublist li{display:flex;gap:9px;align-items:flex-start;padding:7px 8px;border-radius:7px}
+  .sublist li:hover{background:var(--panel2)}
+  .sublist input{margin-top:3px;width:16px;height:16px;accent-color:var(--green);cursor:pointer}
+  .sublist li.done label{color:var(--muted);text-decoration:line-through}
+  .sublist label{cursor:pointer;flex:1}
+  .ac{background:var(--panel2);border:1px solid var(--border);border-left:3px solid var(--green);border-radius:8px;padding:9px 11px;margin-top:12px;font-size:13px}
+  .ac b{color:var(--green)}
+  .statusrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
+  .sbtn{padding:5px 10px;border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;background:var(--panel2);color:var(--muted)}
+  .sbtn.cur{background:var(--accent2);color:#fff;border-color:var(--accent)}
+  .res{margin-top:14px;font-size:12.5px;color:var(--muted)}
+  .res a{display:block;margin:3px 0}
+
+  /* roadmap */
+  .road{display:flex;flex-direction:column;gap:10px;max-width:900px}
+  .rep{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .rep .rt{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+  .rep h3{margin:0;font-size:15px}
+  .rep .win{color:var(--muted);font-size:12px}
+  .rep .rbar{height:9px;background:#0a0e14;border-radius:99px;margin-top:10px;overflow:hidden;border:1px solid var(--border)}
+  .rep .rbar > i{display:block;height:100%;background:linear-gradient(90deg,#2ea043,#2f81f7)}
+  .ms{display:inline-block;font-size:11px;font-weight:700;color:#e3b341;border:1px solid rgba(210,153,34,.4);background:rgba(210,153,34,.12);border-radius:99px;padding:2px 9px}
+
+  /* log */
+  .logwrap{max-width:760px}
+  .loginput{display:flex;gap:8px;margin-bottom:14px}
+  .loginput input{flex:1;background:var(--panel);border:1px solid var(--border);color:var(--txt);border-radius:8px;padding:9px 11px;font-size:13px}
+  .logitem{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:8px;display:flex;gap:10px;align-items:flex-start}
+  .logitem .dt{color:var(--accent);font-weight:700;font-size:12px;white-space:nowrap}
+  .logitem .del{margin-left:auto;color:var(--muted);cursor:pointer}
+  .empty{color:var(--muted);text-align:center;padding:30px}
+</style>
+</head>
+<body>
+<header>
+  <div class="hrow">
+    <div>
+      <h1>📊 Indian Stock Market — ML Task Board</h1>
+      <div class="sub" id="tagline">Data pipeline → ML → RAG → Full-stack → AWS · ~2–3 hrs/day</div>
+    </div>
+    <div class="spacer"></div>
+    <div class="prog-wrap">
+      <span class="sub" id="progtxt">0%</span>
+      <div class="bar"><i id="progbar"></i></div>
+    </div>
+    <div class="tabs">
+      <div class="tab active" data-view="board">Board</div>
+      <div class="tab" data-view="road">Roadmap</div>
+      <div class="tab" data-view="log">Log</div>
+    </div>
+    <button class="btn small" id="exportBtn" title="Save progress to a JSON file you can commit">⬇ Export</button>
+    <button class="btn small" id="importBtn" title="Load progress from a JSON file">⬆ Import</button>
+    <input type="file" id="importFile" accept="application/json" hidden />
+    <button class="btn small" id="resetBtn" title="Wipe all progress">↺ Reset</button>
+  </div>
+</header>
+
+<main>
+  <div id="view-board">
+    <div class="filters" id="epicFilters"></div>
+    <div class="board" id="board"></div>
+  </div>
+  <div id="view-road" style="display:none"><div class="road" id="road"></div></div>
+  <div id="view-log" style="display:none">
+    <div class="logwrap">
+      <div class="loginput">
+        <input id="logText" placeholder="What did you do today? (auto-dates)  e.g. Finished E1-T3 · next: E1-T4" />
+        <button class="btn" id="logAdd">Add</button>
+      </div>
+      <div id="logList"></div>
+    </div>
+  </div>
+</main>
+
+<div class="overlay" id="overlay"><div class="modal" id="modal"></div></div>
+
+<script>
+/* ============================ DATA ============================ */
+const STATUSES = [
+  {id:"backlog", name:"Backlog"},
+  {id:"todo", name:"Todo"},
+  {id:"in_progress", name:"In Progress"},
+  {id:"review", name:"Review"},
+  {id:"done", name:"Done"},
+];
+// diff: e=easy(comfortable) s=stretch n=new-territory
+const EPICS = [
+  {id:"E0", name:"Foundation & Reproducibility", theme:"Trustworthy, reproducible data before ML", window:"Jul 07 – Jul 13", milestone:null,
+   resources:["scikit-learn Getting Started","pandas to_parquet docs","Kaggle: Data Leakage micro-course"],
+   tasks:[
+    {id:"E0-T1",t:"Capture table schemas as SQL DDL",d:"e",h:2,ac:"Recreating a table from sql/schema.sql lets a feature job run.",subs:["Export DDL for all raw + feature + label tables","Save as sql/schema.sql with unique constraints","Add README line: psql -f sql/schema.sql"]},
+    {id:"E0-T2",t:"Add ML/eval Python dependencies",d:"e",h:1,ac:"import sklearn,xgboost,lightgbm,shap,optuna,mlflow runs clean.",subs:["Add sklearn,xgboost,lightgbm,matplotlib,seaborn,jupyter,shap,optuna,mlflow,joblib","pip install -r requirements.txt","Verify imports"]},
+    {id:"E0-T3",t:"Freeze a versioned training snapshot",d:"s",h:2,ac:"A parquet you can reload identically tomorrow.",subs:["Write ml/data/export_snapshot.py","Write parquet to ml/data/snapshots/","Record rows + date range + class balance sidecar"]},
+    {id:"E0-T4",t:"Data-quality sanity checks",d:"s",h:3,ac:"You can state label balance & any mostly-null feature.",subs:["Write ml/data/quality_report.py","Per-symbol: nulls, dupes, gaps, class balance","Eyeball & flag anomalies"]},
+    {id:"E0-T5",t:"Verify no future leakage (feature contract)",d:"n",h:3,ac:"Written list of safe X columns vs labels/leakage.",subs:["Classify each feature: computable at time T?","Confirm future_*/target_direction are the only forward cols","Write the feature contract in ml/README.md"]},
+    {id:"E0-T6",t:"Scaffold ml/ project structure",d:"e",h:1,ac:"Clean conventional ML skeleton exists.",subs:["Create ml/{data,notebooks,models,src}","gitignore model artifacts & snapshots","Stub ml/README.md"]},
+  ]},
+  {id:"E1", name:"ML Baseline", theme:"First honest, leak-free prediction", window:"Jul 14 – Jul 27", milestone:"M1 · First Signal",
+   resources:["scikit-learn Pipeline + TimeSeriesSplit","StatQuest (YouTube): ROC/AUC, boosting","XGBoost/LightGBM quickstarts","López de Prado — labeling & CV (skim)"],
+   tasks:[
+    {id:"E1-T1",t:"EDA notebook",d:"s",h:3,ac:"Name 3 predictive & 2 useless features.",subs:["Load snapshot in 01_eda.ipynb","Plot class balance, distributions, correlation heatmap","Note constant/redundant/null features"]},
+    {id:"E1-T2",t:"Define feature contract (X, y) in code",d:"e",h:2,ac:"load_dataset() returns aligned X,y with zero leakage cols.",subs:["ml/src/dataset.py returning X,y","Drop future_*, reward_risk_ratio, event_time, decide on symbol","Handle NaNs (drop/impute) & document"]},
+    {id:"E1-T3",t:"Time-based train/test split (not random)",d:"n",h:2,ac:"Every test timestamp is later than every train timestamp.",subs:["Split by event_time, earlier 80% train / recent 20% test","No shuffle=True","Read TimeSeriesSplit docs"]},
+    {id:"E1-T4",t:"Establish naive baselines",d:"e",h:1,ac:"Two baseline accuracy numbers written down.",subs:["Majority-class accuracy","'predict up if last candle up' accuracy"]},
+    {id:"E1-T5",t:"Train baseline models",d:"s",h:3,ac:"Both models predict on holdout without leakage.",subs:["LogisticRegression in a scaled Pipeline","XGB/LGBM with class imbalance handling","Predict on time-holdout"]},
+    {id:"E1-T6",t:"Evaluate with the right metrics",d:"n",h:3,ac:"Written verdict vs naive baselines.",subs:["accuracy/precision/recall/F1/ROC-AUC/PR-AUC + confusion","Precision at high confidence (trading read)","Compare to E1-T4 baselines"]},
+    {id:"E1-T7",t:"Save model + metrics artifact",d:"e",h:2,ac:"Reload the model & reproduce a prediction.",subs:["joblib.dump the winning pipeline","Save metrics + feature list JSON","5-line model card in ml/README.md"]},
+  ]},
+  {id:"E2", name:"ML Iteration & Validation", theme:"Make it actually good & trustworthy", window:"Jul 28 – Aug 17", milestone:"M2 · Trustworthy Model",
+   resources:["SHAP docs + tutorial","Optuna quickstart","MLflow tracking quickstart","'Why your backtest lies' blog searches"],
+   tasks:[
+    {id:"E2-T1",t:"Walk-forward / expanding-window CV",d:"n",h:4,ac:"Know if performance is stable across time.",subs:["TimeSeriesSplit across multiple windows","Report mean ± std of key metric"]},
+    {id:"E2-T2",t:"Feature importance & pruning (SHAP)",d:"s",h:3,ac:"Ranked feature list + keep/drop decision.",subs:["SHAP summary plot","Drop low-signal features & re-test"]},
+    {id:"E2-T3",t:"Feature engineering round 2",d:"s",h:4,ac:"Kept only features that improved walk-forward metrics.",subs:["Add RSI regimes, EMA-cross, vol-adj returns, time-of-day","Update Spark select+schema OR compute in pandas","Re-run E2-T1"]},
+    {id:"E2-T4",t:"Class imbalance & threshold tuning",d:"n",h:3,ac:"A chosen probability threshold with a reason.",subs:["Try class_weight/scale_pos_weight","Pick threshold from PR curve, not 0.5"]},
+    {id:"E2-T5",t:"Hyperparameter tuning (Optuna)",d:"s",h:3,ac:"Best params saved; no overfit to val folds.",subs:["Optuna study inside walk-forward CV","Cap trials (~50)","Keep a final untouched test period"]},
+    {id:"E2-T6",t:"Signal backtest simulation",d:"n",h:5,ac:"Equity curve + verdict: value after costs?",subs:["Probabilities → simulated trades using future_* truth","Track cum return, win rate, drawdown, costs","Compare to buy-and-hold"]},
+    {id:"E2-T7",t:"Experiment tracking (MLflow)",d:"s",h:3,ac:"Every experiment logged & comparable.",subs:["Wrap training in mlflow.start_run()","Log params, metrics, artifact","Browse mlflow ui"]},
+  ]},
+  {id:"E3", name:"RAG & Sentiment Layer", theme:"Context-aware signals with a 'why'", window:"Aug 18 – Sep 07", milestone:"M3 · Context-Aware",
+   resources:["Anthropic docs: Messages API, prompt caching","pgvector GitHub README","sentence-transformers / FinBERT","Claude models: opus-4-8 (reasoning), haiku-4-5 (cheap sentiment)"],
+   tasks:[
+    {id:"E3-T1",t:"News ingestion for the 5 tickers",d:"s",h:4,ac:"news_articles table, deduped by URL, IST times.",subs:["Pull RSS / News API / yfinance .news","Store symbol,published_at,title,body,url,source","Respect ToS / rate limits"]},
+    {id:"E3-T2",t:"Enable pgvector & embeddings",d:"n",h:4,ac:"Cosine query returns top-k similar articles.",subs:["CREATE EXTENSION vector; add news_embeddings table","Embed with all-MiniLM-L6-v2 (local, free)","Add ivfflat/hnsw index"]},
+    {id:"E3-T3",t:"Sentiment scoring",d:"s",h:4,ac:"A symbol_sentiment time series to join to features.",subs:["FinBERT OR Claude Haiku for scoring","Store score(-1..1) + label","Aggregate per symbol / time bucket"]},
+    {id:"E3-T4",t:"RAG pipeline (retrieve → generate)",d:"n",h:5,ac:"Cited, plain-English rationale for a signal.",subs:["rag/explain_signal.py: retrieve top-k via pgvector","Anthropic SDK, model claude-opus-4-8, adaptive thinking","Instruct to cite & say 'no relevant news' when weak"]},
+    {id:"E3-T5",t:"Feed sentiment into model & measure lift",d:"s",h:4,ac:"Sentiment earns its place or gets cut.",subs:["Add sentiment feature; re-run CV + backtest","Compare with vs without","Only use news published before candle T"]},
+    {id:"E3-T6",t:"LLM guardrails & cost controls",d:"s",h:2,ac:"Predictable spend + graceful failure.",subs:["Cache explanations; consider Batch API for bulk","Log tokens/cost; set max_tokens","Handle stop_reason + RateLimitError"]},
+  ]},
+  {id:"E4", name:"Backend API (FastAPI)", theme:"Serve the predictions", window:"Sep 08 – Sep 17", milestone:null,
+   resources:["FastAPI official tutorial","Pydantic v2 models","python-dotenv","Dockerizing FastAPI guides"],
+   tasks:[
+    {id:"E4-T1",t:"FastAPI skeleton & config",d:"e",h:2,ac:"uvicorn serves and /docs loads.",subs:["Scaffold api/{main,routers,schemas,services}","Wire config/settings.py + .env (fix market_db name)","Verify Swagger"]},
+    {id:"E4-T2",t:"Model loader service",d:"e",h:2,ac:"Model loads at boot & predicts from a dict.",subs:["Load .pkl once at startup","Load saved feature list","Expose predict()"]},
+    {id:"E4-T3",t:"Feature-fetch service",d:"s",h:3,ac:"Valid symbol → ready-to-predict vector.",subs:["Fetch latest intraday_market_features row","Shape into model input","Handle missing symbol/candle"]},
+    {id:"E4-T4",t:"Core endpoints",d:"e",h:3,ac:"/health, /signal/{sym}, /signals return correct JSON.",subs:["GET /health with model version","GET /signal/{symbol}","GET /signals (all 5) + Pydantic models"]},
+    {id:"E4-T5",t:"RAG explanation endpoint",d:"s",h:3,ac:"Cited explanation, cached on repeat.",subs:["GET /signal/{symbol}/explain calls E3","Async + cache","Return signal immediately, explanation separately"]},
+    {id:"E4-T6",t:"Dockerize the API",d:"s",h:2,ac:"docker-compose up → /signals works from container.",subs:["docker/api.Dockerfile","Add api service to docker-compose","Talk to Postgres over compose network"]},
+  ]},
+  {id:"E5", name:"Frontend App", theme:"The thing you can show people", window:"Sep 18 – Oct 08", milestone:"M4 · Live Locally",
+   resources:["react.dev Quick Start + Vite (or Streamlit)","Tailwind CSS docs","lightweight-charts / recharts examples","FastAPI CORS docs"],
+   tasks:[
+    {id:"E5-T1",t:"Choose stack & scaffold",d:"s",h:3,ac:"Dev server runs with hot reload.",subs:["Decide React+Vite vs Streamlit; document why","Scaffold in dashboard/","Hello world in browser"]},
+    {id:"E5-T2",t:"Connect to the backend",d:"s",h:3,ac:"Live API data appears in browser.",subs:["Call GET /signals","Add CORSMiddleware for localhost:5173","Render raw JSON"]},
+    {id:"E5-T3",t:"Ticker signal cards",d:"s",h:4,ac:"5 cards render live signals.",subs:["Card: symbol, direction ▲▼, confidence, as-of","Loading + error states"]},
+    {id:"E5-T4",t:"Price chart component",d:"n",h:5,ac:"Readable price chart for a selected ticker.",subs:["Endpoint feeds recent candles","Candlestick/line via lightweight-charts/recharts","Overlay signal markers"]},
+    {id:"E5-T5",t:"News & rationale panel",d:"s",h:4,ac:"Clicking a ticker shows explanation + cited news.",subs:["Call /signal/{symbol}/explain","Show sentiment + source links","Spinner during LLM call"]},
+    {id:"E5-T6",t:"Layout, polish & responsiveness",d:"s",h:4,ac:"Looks like a real (simple) product.",subs:["Grid: cards + chart + panel (Tailwind)","Dark theme, laptop-usable","Manual + auto refresh"]},
+    {id:"E5-T7",t:"Frontend Dockerfile",d:"e",h:2,ac:"Full stack via docker-compose up.",subs:["Multi-stage build → nginx (or Streamlit)","Add to docker-compose"]},
+  ]},
+  {id:"E6", name:"AWS Deployment", theme:"Into production, without a scary bill", window:"Oct 09 – Oct 29", milestone:"M5 · In Production",
+   resources:["AWS free tier + budget alert","App Runner deploy-from-ECR tutorial","RDS Postgres getting started","GitHub Actions → AWS via OIDC"],
+   tasks:[
+    {id:"E6-T1",t:"AWS account, IAM, budget & billing alarm",d:"n",h:3,ac:"aws sts get-caller-identity works; budget armed.",subs:["MFA on root; create IAM admin user","Budget ($20/mo) + alerts 50/80/100%","Configure AWS CLI"]},
+    {id:"E6-T2",t:"Fix hardcoded creds → Secrets Manager",d:"s",h:3,ac:"No plaintext DB password in prod image/repo.",subs:["Move DB creds to Secrets Manager / SSM","API reads secrets at boot"]},
+    {id:"E6-T3",t:"Managed Postgres on RDS",d:"n",h:4,ac:"Connect to RDS; tables exist.",subs:["Launch db.t3.micro (free tier); enable pgvector","Run sql/schema.sql + load snapshot","Lock down security group"]},
+    {id:"E6-T4",t:"Container registry (ECR) & push",d:"s",h:3,ac:"Both images in ECR.",subs:["Create ECR repos api + frontend","Auth Docker to ECR","Build/tag/push"]},
+    {id:"E6-T5",t:"Run the containers (App Runner/Fargate)",d:"n",h:5,ac:"Public API URL returns signals; frontend loads online.",subs:["Deploy API (App Runner recommended)","Wire env/secrets to RDS","Deploy frontend → API URL"]},
+    {id:"E6-T6",t:"CI/CD with GitHub Actions",d:"n",h:4,ac:"Push to main ships to AWS.",subs:["Workflow: build→ECR→deploy on push","AWS creds via OIDC role"]},
+    {id:"E6-T7",t:"Logs, metrics & teardown runbook",d:"s",h:3,ac:"Find logs in CloudWatch; written cost kill-switch.",subs:["Logs → CloudWatch; alarm on 5xx","docs/RUNBOOK.md: deploy, rollback, teardown"]},
+  ]},
+  {id:"E7", name:"MLOps & Monitoring", theme:"Keep it alive & honest (parallel)", window:"Parallel from Aug", milestone:null,
+   resources:["Airflow core concepts + first DAG","MLflow Model Registry","evidently (drift) docs","Google 'Rules of ML'"],
+   tasks:[
+    {id:"E7-T1",t:"Orchestrate pipeline (Airflow DAG)",d:"n",h:5,ac:"Full feature/label pipeline runs on a schedule.",subs:["DAG: daily feat → intraday feat → labels → snapshot","IST-aware schedule after close","(cron+runner is a valid v1)"]},
+    {id:"E7-T2",t:"Scheduled retraining",d:"s",h:4,ac:"A worse model can't auto-deploy.",subs:["Retrain on fresh data, log to MLflow","Promote only if it beats champion (walk-forward)"]},
+    {id:"E7-T3",t:"Data drift monitoring",d:"s",h:3,ac:"Notified if data stops resembling training.",subs:["Track feature distributions over time (evidently)","Alert on large drift"]},
+    {id:"E7-T4",t:"Prediction/performance monitoring",d:"n",h:4,ac:"Know if live model still performs like in testing.",subs:["Log predictions; join to realized future_* truth","Track rolling live precision vs backtest"]},
+    {id:"E7-T5",t:"Alerting",d:"e",h:2,ac:"Real alert fires on stale/bad data.",subs:["Wire drift/perf alerts to email/Slack","Test with deliberately bad data"]},
+  ]},
+];
+const DEFAULT_STATUS = id => (id.startsWith("E0")||id.startsWith("E1")) ? "todo" : "backlog";
+const DIFF = {e:{c:"d-e",l:"comfortable"}, s:{c:"d-s",l:"stretch"}, n:{c:"d-n",l:"new territory"}};
+
+/* ============================ STATE ============================ */
+const LS_KEY = "smb_v1";
+const ALL_TASKS = EPICS.flatMap(e => e.tasks.map(t => ({...t, epic:e.id})));
+const TASK_BY_ID = Object.fromEntries(ALL_TASKS.map(t => [t.id, t]));
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(LS_KEY)) || {}; }catch(e){ return {}; }
+}
+function blankState(){
+  const st = {tasks:{}, log:[]};
+  ALL_TASKS.forEach(t => st.tasks[t.id] = {status: DEFAULT_STATUS(t.id), subs: t.subs.map(()=>false)});
+  return st;
+}
+let S = (() => {
+  const saved = load();
+  const base = blankState();
+  if(saved.tasks){
+    for(const id in base.tasks){
+      if(saved.tasks[id]){
+        base.tasks[id].status = saved.tasks[id].status || base.tasks[id].status;
+        const sv = saved.tasks[id].subs;
+        if(Array.isArray(sv)) base.tasks[id].subs = base.tasks[id].subs.map((_,i)=> !!sv[i]);
+      }
+    }
+  }
+  base.log = saved.log || [];
+  return base;
+})();
+function save(){ localStorage.setItem(LS_KEY, JSON.stringify(S)); }
+
+let filterEpic = "all";
+let curView = "board";
+
+/* ============================ HELPERS ============================ */
+const $ = s => document.querySelector(s);
+const el = (tag, cls, html) => { const n=document.createElement(tag); if(cls)n.className=cls; if(html!=null)n.innerHTML=html; return n; };
+function taskPct(id){ const s=S.tasks[id].subs; return s.length? Math.round(100*s.filter(Boolean).length/s.length):0; }
+function epicPct(eid){
+  const ts = EPICS.find(e=>e.id===eid).tasks;
+  const done = ts.filter(t=>S.tasks[t.id].status==="done").length;
+  return Math.round(100*done/ts.length);
+}
+function overallPct(){
+  const done = ALL_TASKS.filter(t=>S.tasks[t.id].status==="done").length;
+  return Math.round(100*done/ALL_TASKS.length);
+}
+function updateHeaderProgress(){
+  const p = overallPct();
+  $("#progbar").style.width = p+"%";
+  const doneN = ALL_TASKS.filter(t=>S.tasks[t.id].status==="done").length;
+  $("#progtxt").textContent = `${p}% · ${doneN}/${ALL_TASKS.length} tasks`;
+}
+
+/* ============================ BOARD VIEW ============================ */
+function renderFilters(){
+  const box = $("#epicFilters"); box.innerHTML="";
+  const mk = (id,label,pct) => {
+    const c = el("div","chip"+(filterEpic===id?" on":""), pct!=null?`${label} · ${pct}%`:label);
+    c.onclick = ()=>{ filterEpic=id; renderFilters(); renderBoard(); };
+    box.appendChild(c);
+  };
+  mk("all","All epics");
+  EPICS.forEach(e=> mk(e.id, e.id+" "+e.name, epicPct(e.id)));
+}
+function renderBoard(){
+  const board = $("#board"); board.innerHTML="";
+  STATUSES.forEach(st => {
+    const col = el("div","col"); col.dataset.status = st.id;
+    const tasks = ALL_TASKS.filter(t => S.tasks[t.id].status===st.id && (filterEpic==="all"||t.epic===filterEpic));
+    col.appendChild(el("h3",null,`${st.name}<span class="n">${tasks.length}</span>`));
+    tasks.forEach(t => col.appendChild(taskCard(t)));
+    // drag targets
+    col.addEventListener("dragover", e=>{ e.preventDefault(); col.classList.add("drop"); });
+    col.addEventListener("dragleave", ()=> col.classList.remove("drop"));
+    col.addEventListener("drop", e=>{
+      e.preventDefault(); col.classList.remove("drop");
+      const id = e.dataTransfer.getData("text/plain");
+      if(id && S.tasks[id]){ S.tasks[id].status = st.id; save(); renderAll(); }
+    });
+    board.appendChild(col);
+  });
+}
+function taskCard(t){
+  const c = el("div","card"); c.style.borderLeftColor = diffColor(t.d);
+  c.draggable = true;
+  c.innerHTML = `<div class="cid">${t.id} · ⏱${t.h}h</div>
+    <div class="ct">${t.t}</div>
+    <div class="meta"><span class="pill ${DIFF[t.d].c}">${DIFF[t.d].l}</span><span class="epk">${t.epic}</span></div>
+    <div class="miniprog"><i style="width:${taskPct(t.id)}%"></i></div>`;
+  c.addEventListener("dragstart", e=>{ e.dataTransfer.setData("text/plain", t.id); c.classList.add("dragging"); });
+  c.addEventListener("dragend", ()=> c.classList.remove("dragging"));
+  c.addEventListener("click", ()=> openTask(t.id));
+  return c;
+}
+function diffColor(d){ return d==="e"?"#2ea043":d==="s"?"#d29922":"#da3633"; }
+
+/* ============================ TASK MODAL ============================ */
+function openTask(id){
+  const t = TASK_BY_ID[id]; const epic = EPICS.find(e=>e.id===t.epic);
+  const stObj = S.tasks[id];
+  const m = $("#modal");
+  m.innerHTML = `
+    <div class="mhead">
+      <span class="x" id="closeX">&times;</span>
+      <div class="cid" style="color:var(--muted);font-weight:700">${t.id} · ${epic.name} · ⏱ ${t.h}h focused</div>
+      <h2>${t.t}</h2>
+      <span class="pill ${DIFF[t.d].c}">${DIFF[t.d].l}</span>
+    </div>
+    <div class="mbody">
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Subtasks</div>
+      <ul class="sublist" id="subs"></ul>
+      <div class="ac"><b>✓ Done when:</b> ${t.ac}</div>
+      <div style="font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:16px">Status</div>
+      <div class="statusrow" id="statusRow"></div>
+      <div class="res"><b style="color:var(--muted)">📚 Epic resources</b>${epic.resources.map(r=>`<span>• ${r}</span>`).join("")}</div>
+    </div>`;
+  const ul = m.querySelector("#subs");
+  t.subs.forEach((s,i)=>{
+    const li = el("li", stObj.subs[i]?"done":"");
+    const cb = el("input"); cb.type="checkbox"; cb.checked=stObj.subs[i]; cb.id="sb"+i;
+    const lb = el("label",null,s); lb.htmlFor="sb"+i;
+    cb.onchange = ()=>{
+      stObj.subs[i]=cb.checked; li.classList.toggle("done",cb.checked); save(); updateHeaderProgress(); renderBoard();
+      // helpful nudge: all subs done & not done → suggest review
+      if(stObj.subs.every(Boolean) && stObj.status!=="done" && stObj.status!=="review"){ setStatus(id,"review"); renderStatusRow(id); }
+    };
+    li.appendChild(cb); li.appendChild(lb); ul.appendChild(li);
+  });
+  renderStatusRow(id);
+  m.querySelector("#closeX").onclick = closeModal;
+  $("#overlay").classList.add("show");
+}
+function renderStatusRow(id){
+  const row = $("#statusRow"); if(!row) return; row.innerHTML="";
+  STATUSES.forEach(st=>{
+    const b = el("div","sbtn"+(S.tasks[id].status===st.id?" cur":""), st.name);
+    b.onclick = ()=>{ setStatus(id, st.id); renderStatusRow(id); renderAll(); };
+    row.appendChild(b);
+  });
+}
+function setStatus(id, s){ S.tasks[id].status=s; save(); }
+function closeModal(){ $("#overlay").classList.remove("show"); }
+$("#overlay").addEventListener("click", e=>{ if(e.target.id==="overlay") closeModal(); });
+document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+/* ============================ ROADMAP VIEW ============================ */
+function renderRoad(){
+  const r = $("#road"); r.innerHTML="";
+  EPICS.forEach(e=>{
+    const p = epicPct(e.id);
+    const rep = el("div","rep");
+    rep.innerHTML = `<div class="rt">
+        <div><h3>${e.id} · ${e.name}</h3><div class="win">${e.window} — ${e.theme}</div></div>
+        <div style="text-align:right">${e.milestone?`<div class="ms">🏁 ${e.milestone}</div>`:""}<div class="win" style="margin-top:4px">${p}% · ${e.tasks.filter(t=>S.tasks[t.id].status==="done").length}/${e.tasks.length}</div></div>
+      </div>
+      <div class="rbar"><i style="width:${p}%"></i></div>`;
+    rep.onclick = ()=>{ filterEpic=e.id; switchView("board"); renderFilters(); renderBoard(); };
+    rep.style.cursor="pointer";
+    r.appendChild(rep);
+  });
+}
+
+/* ============================ LOG VIEW ============================ */
+function renderLog(){
+  const list = $("#logList"); list.innerHTML="";
+  if(!S.log.length){ list.appendChild(el("div","empty","No entries yet. Log one line at the end of each session.")); return; }
+  S.log.forEach((e,i)=>{
+    const it = el("div","logitem");
+    it.innerHTML = `<span class="dt">${e.d}</span><span>${e.t}</span><span class="del" data-i="${i}">✕</span>`;
+    it.querySelector(".del").onclick = ()=>{ S.log.splice(i,1); save(); renderLog(); };
+    list.appendChild(it);
+  });
+}
+$("#logAdd").onclick = addLog;
+$("#logText").addEventListener("keydown", e=>{ if(e.key==="Enter") addLog(); });
+function addLog(){
+  const v = $("#logText").value.trim(); if(!v) return;
+  const d = new Date().toISOString().slice(0,10);
+  S.log.unshift({d, t:v}); save(); $("#logText").value=""; renderLog();
+}
+
+/* ============================ VIEW SWITCH ============================ */
+document.querySelectorAll(".tab").forEach(tab=>{
+  tab.onclick = ()=> switchView(tab.dataset.view);
+});
+function switchView(v){
+  curView=v;
+  document.querySelectorAll(".tab").forEach(t=> t.classList.toggle("active", t.dataset.view===v));
+  $("#view-board").style.display = v==="board"?"":"none";
+  $("#view-road").style.display  = v==="road"?"":"none";
+  $("#view-log").style.display   = v==="log"?"":"none";
+  if(v==="road") renderRoad();
+  if(v==="log") renderLog();
+}
+
+/* ============================ IMPORT/EXPORT/RESET ============================ */
+$("#exportBtn").onclick = ()=>{
+  const blob = new Blob([JSON.stringify(S,null,2)], {type:"application/json"});
+  const a = el("a"); a.href = URL.createObjectURL(blob);
+  a.download = `taskboard-progress-${new Date().toISOString().slice(0,10)}.json`;
+  a.click(); URL.revokeObjectURL(a.href);
+};
+$("#importBtn").onclick = ()=> $("#importFile").click();
+$("#importFile").onchange = e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      const base = blankState();
+      if(data.tasks) for(const id in base.tasks){ if(data.tasks[id]){ base.tasks[id].status=data.tasks[id].status||base.tasks[id].status; if(Array.isArray(data.tasks[id].subs)) base.tasks[id].subs=base.tasks[id].subs.map((_,i)=>!!data.tasks[id].subs[i]); } }
+      base.log = data.log || [];
+      S = base; save(); renderAll(); alert("Progress imported ✓");
+    }catch(err){ alert("Could not read that file: "+err.message); }
+  };
+  reader.readAsText(f); e.target.value="";
+};
+$("#resetBtn").onclick = ()=>{
+  if(confirm("Wipe ALL progress and start fresh? (Export first if unsure.)")){ S = blankState(); save(); renderAll(); }
+};
+
+/* ============================ INIT ============================ */
+function renderAll(){ updateHeaderProgress(); renderFilters(); renderBoard(); if(curView==="road") renderRoad(); }
+renderAll();
+</script>
+</body>
+</html>

@@ -3,6 +3,7 @@ from pyspark.sql.functions import *
 
 import psycopg2
 
+
 # ----------------------------------
 # PostgreSQL Connection
 # ----------------------------------
@@ -21,69 +22,29 @@ cursor = conn.cursor()
 # Spark Session
 # ----------------------------------
 
-spark = (
-    SparkSession.builder
-    .appName("Intraday Model Dataset Generator")
-    .getOrCreate()
-)
+spark = SparkSession.builder.appName('Intraday Model Dataset Generator').getOrCreate()
 
 # ----------------------------------
 # Read Feature Table
 # ----------------------------------
 
 feature_df = (
-    spark.read
-    .format("jdbc")
-    .option(
-        "url",
-        "jdbc:postgresql://localhost:5432/market_db"
-    )
-    .option(
-        "dbtable",
-        "intraday_market_features"
-    )
-    .option(
-        "user",
-        "postgres"
-    )
-    .option(
-        "password",
-        "password"
-    )
-    .option(
-        "driver",
-        "org.postgresql.Driver"
-    )
+    spark.read.format("jdbc")
+    .option("url","jdbc:postgresql://localhost:5432/market_db")
+    .option("dbtable","intraday_market_features")
+    .option("user","postgres")
+    .option("password","password")
+    .option( "driver","org.postgresql.Driver")
     .load()
 )
 
-# ----------------------------------
-# Read Label Table
-# ----------------------------------
-
 label_df = (
-    spark.read
-    .format("jdbc")
-    .option(
-        "url",
-        "jdbc:postgresql://localhost:5432/market_db"
-    )
-    .option(
-        "dbtable",
-        "intraday_training_dataset"
-    )
-    .option(
-        "user",
-        "postgres"
-    )
-    .option(
-        "password",
-        "password"
-    )
-    .option(
-        "driver",
-        "org.postgresql.Driver"
-    )
+    spark.read.format("jdbc")
+    .option("url","jdbc:postgresql://localhost:5432/market_db")
+    .option("dbtable","intraday_training_dataset")
+    .option("user","postgres")
+    .option("password","password")
+    .option( "driver","org.postgresql.Driver")
     .load()
 )
 
@@ -91,24 +52,17 @@ label_df = (
 # Join Features + Labels
 # ----------------------------------
 
+
 model_df = (
-
     feature_df.alias("f")
-
     .join(
-
         label_df.alias("l"),
-
-        on=[
-            col("f.symbol") == col("l.symbol"),
-            col("f.event_time") == col("l.event_time")
-        ],
-
-        how="inner"
-
-    )
-
+          on = [ col("f.symbol") == col("l.symbol"),
+                 col("f.event_time") == col("l.event_time") ],
+                 how = "inner"
+          )
 )
+
 
 # ----------------------------------
 # Final Dataset
@@ -187,29 +141,23 @@ final_df = model_df.select(
 
 )
 
+
 # ----------------------------------
 # Validation
 # ----------------------------------
 
-print(f"Rows in Model Dataset : {final_df.count()}")
+print(f"Rows in final dataframe : {final_df.count()}")
 
-final_df.show(
-    20,
-    truncate=False
-)
+final_df.show(20, truncate = False)
 
 # ----------------------------------
 # Truncate Target Table
 # ----------------------------------
 
-cursor.execute(
-    "TRUNCATE TABLE intraday_model_dataset RESTART IDENTITY;"
-)
-
+cursor.execute("TRUNCATE TABLE intraday_model_dataset RESTART IDENTITY;")
 conn.commit()
-
 cursor.close()
-conn.close()
+conn.commit()
 
 # ----------------------------------
 # Write to PostgreSQL
@@ -245,5 +193,9 @@ print("Writing model dataset...")
 )
 
 print("Model dataset created successfully!")
+
+print("Feature Rows :", feature_df.count())
+print("Label Rows   :", label_df.count())
+print("Model Rows   :", final_df.count())
 
 spark.stop()
